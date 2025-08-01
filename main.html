@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aether Weave: Volumetric Plaid Nebula</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #000;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: white;
+        }
+
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+
+        #controls {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            min-width: 280px;
+            border: 1px solid rgba(93, 92, 222, 0.3);
+            transition: opacity 0.3s ease;
+        }
+
+        #controls.hidden {
+            opacity: 0.1;
+        }
+
+        #controls:hover {
+            opacity: 1;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 12px;
+            color: #5D5CDE;
+            font-weight: 600;
+        }
+
+        .control-group input[type="range"] {
+            width: 100%;
+            height: 6px;
+            background: rgba(93, 92, 222, 0.2);
+            outline: none;
+            border-radius: 3px;
+            -webkit-appearance: none;
+        }
+
+        .control-group input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #5D5CDE;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+
+        .control-group input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            background: #5D5CDE;
+            cursor: pointer;
+            border-radius: 50%;
+            border: none;
+        }
+
+        .color-picker {
+            width: 40px;
+            height: 25px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+
+        .button {
+            background: #5D5CDE;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 12px;
+            margin: 5px 5px 5px 0;
+            transition: background 0.3s ease;
+        }
+
+        .button:hover {
+            background: #4a49c7;
+        }
+
+        .button.active {
+            background: #7b7af0;
+        }
+
+        #info {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 15px;
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.7);
+            max-width: 300px;
+            border: 1px solid rgba(93, 92, 222, 0.3);
+        }
+
+        #audio-visualizer {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 200px;
+            height: 80px;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            border: 1px solid rgba(93, 92, 222, 0.3);
+            padding: 10px;
+            z-index: 100;
+        }
+
+        .audio-bar {
+            width: 3px;
+            background: #5D5CDE;
+            margin: 0 1px;
+            border-radius: 2px;
+            display: inline-block;
+            transition: height 0.1s ease;
+        }
+
+        #loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1000;
+            color: #5D5CDE;
+            font-size: 18px;
+            text-align: center;
+        }
+
+        .spinner {
+            border: 3px solid rgba(93, 92, 222, 0.3);
+            border-top: 3px solid #5D5CDE;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            #controls {
+                top: 10px;
+                left: 10px;
+                right: 10px;
+                min-width: auto;
+                padding: 15px;
+            }
+
+            #info {
+                bottom: 10px;
+                left: 10px;
+                right: 10px;
+                max-width: none;
+            }
+
+            #audio-visualizer {
+                top: 10px;
+                right: 10px;
+                width: 120px;
+                height: 60px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">
+        <div class="spinner"></div>
+        <div>Initializing Aether Weave...</div>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <div id="controls">
+        <div class="control-group">
+            <label>Plaid Scale</label>
+            <input type="range" id="plaidScale" min="0.1" max="3.0" step="0.1" value="1.0">
+        </div>
+        
+        <div class="control-group">
+            <label>Animation Speed</label>
+            <input type="range" id="animSpeed" min="0.0" max="2.0" step="0.1" value="1.0">
+        </div>
+        
+        <div class="control-group">
+            <label>Density</label>
+            <input type="range" id="density" min="0.1" max="2.0" step="0.1" value="1.0">
+        </div>
+        
+        <div class="control-group">
+            <label>Brightness</label>
+            <input type="range" id="brightness" min="0.1" max="3.0" step="0.1" value="1.0">
+        </div>
+
+        <div class="control-group">
+            <label>Color Palette</label>
+            <input type="color" id="color1" class="color-picker" value="#5d5cde">
+            <input type="color" id="color2" class="color-picker" value="#de5d9c">
+            <input type="color" id="color3" class="color-picker" value="#5dde9c">
+        </div>
+
+        <div class="control-group">
+            <button class="button" id="audioToggle">Enable Audio</button>
+            <button class="button" id="resetView">Reset View</button>
+            <button class="button" id="randomize">Randomize</button>
+        </div>
+    </div>
+
+    <div id="audio-visualizer" style="display: none;">
+        <div style="text-align: center; font-size: 10px; margin-bottom: 5px; color: #5D5CDE;">Audio Reactive</div>
+        <div id="audiobars"></div>
+    </div>
+
+    <div id="info">
+        <strong>Navigation:</strong><br>
+        • Mouse: Look around<br>
+        • WASD/Arrow Keys: Move<br>
+        • Scroll: Zoom<br>
+        • Shift: Move faster<br>
+        <br>
+        <strong>Features:</strong><br>
+        • Real-time volumetric raymarching<br>
+        • Fractal plaid modulation<br>
+        • Audio-reactive dynamics
+    </div>
+
+    <script>
+        // Volumetric Raymarching Vertex Shader
+        const vertexShader = `
+            varying vec2 vUv;
+            varying vec3 vPosition;
+            varying vec3 vWorldPosition;
+            
+            void main() {
+                vUv = uv;
+                vPosition = position;
+                
+                vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+                vWorldPosition = worldPosition.xyz;
+                
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+        `;
+
+        // Volumetric Raymarching Fragment Shader
+        const fragmentShader = `
+            uniform float u_time;
+            uniform float u_plaidScale;
+            uniform float u_animSpeed;
+            uniform float u_density;
+            uniform float u_brightness;
+            uniform vec3 u_color1;
+            uniform vec3 u_color2;
+            uniform vec3 u_color3;
+            uniform vec3 u_cameraPosition;
+            uniform float u_audioLow;
+            uniform float u_audioMid;
+            uniform float u_audioHigh;
+            uniform vec2 u_resolution;
+            
+            varying vec2 vUv;
+            varying vec3 vPosition;
+            varying vec3 vWorldPosition;
+
+            // Noise functions
+            vec3 random3(vec3 c) {
+                float j = 4096.0*sin(dot(c,vec3(17.0, 59.4, 15.0)));
+                vec3 r;
+                r.z = fract(512.0*j);
+                j *= .125;
+                r.x = fract(512.0*j);
+                j *= .125;
+                r.y = fract(512.0*j);
+                return r-0.5;
+            }
+
+            float simplex3d(vec3 p) {
+                const float F3 =  0.3333333;
+                const float G3 =  0.1666667;
+                
+                vec3 s = floor(p + dot(p, vec3(F3)));
+                vec3 x = p - s + dot(s, vec3(G3));
+                
+                vec3 e = step(vec3(0.0), x - x.yzx);
+                vec3 i1 = e*(1.0 - e.zxy);
+                vec3 i2 = 1.0 - e.zxy*(1.0 - e);
+                
+                vec3 x1 = x - i1 + G3;
+                vec3 x2 = x - i2 + 2.0*G3;
+                vec3 x3 = x - 1.0 + 3.0*G3;
+                
+                vec4 w, d;
+                
+                w.x = dot(x, x);
+                w.y = dot(x1, x1);
+                w.z = dot(x2, x2);
+                w.w = dot(x3, x3);
+                
+                w = max(0.6 - w, 0.0);
+                
+                d.x = dot(random3(s), x);
+                d.y = dot(random3(s + i1), x1);
+                d.z = dot(random3(s + i2), x2);
+                d.w = dot(random3(s + 1.0), x3);
+                
+                w *= w;
+                w *= w;
+                d *= w;
+                
+                return dot(d, vec4(52.0));
+            }
+
+            float fbm(vec3 p, int octaves) {
+                float value = 0.0;
+                float amplitude = 0.5;
+                float frequency = 1.0;
+                
+                for(int i = 0; i < 8; i++) {
+                    if(i >= octaves) break;
+                    value += amplitude * simplex3d(p * frequency);
+                    amplitude *= 0.5;
+                    frequency *= 2.0;
+                }
+                return value;
+            }
+
+            // Fractal plaid pattern
+            float plaidPattern(vec3 p, float scale, float time) {
+                vec3 scaledP = p * scale;
+                
+                // Create plaid by combining perpendicular waves with fractal modulation
+                float noise1 = fbm(scaledP + vec3(time * 0.1, 0.0, 0.0), 4);
+                float noise2 = fbm(scaledP + vec3(0.0, time * 0.15, 0.0), 4);
+                float noise3 = fbm(scaledP + vec3(0.0, 0.0, time * 0.12), 4);
+                
+                // Audio-reactive modulation
+                float audioMod = u_audioLow * 0.3 + u_audioMid * 0.4 + u_audioHigh * 0.2;
+                
+                float plaidX = sin(scaledP.x * 3.14159 + noise1 * 2.0 + audioMod * 5.0) * 0.5 + 0.5;
+                float plaidY = sin(scaledP.y * 3.14159 + noise2 * 2.0 + audioMod * 3.0) * 0.5 + 0.5;
+                float plaidZ = sin(scaledP.z * 3.14159 + noise3 * 2.0 + audioMod * 4.0) * 0.5 + 0.5;
+                
+                // Combine plaid layers
+                float plaid = (plaidX * plaidY + plaidY * plaidZ + plaidX * plaidZ) / 3.0;
+                
+                // Add fractal detail
+                float detail = fbm(scaledP * 2.0 + time * 0.3, 6) * 0.3;
+                
+                return clamp(plaid + detail, 0.0, 1.0);
+            }
+
+            // Volumetric density function
+            float getDensity(vec3 p, float time) {
+                float plaid = plaidPattern(p, u_plaidScale, time * u_animSpeed);
+                
+                // Distance-based falloff
+                float dist = length(p);
+                float falloff = exp(-dist * 0.01);
+                
+                // Audio-reactive density modulation
+                float audioBoost = 1.0 + (u_audioLow + u_audioMid) * 0.5;
+                
+                return plaid * u_density * falloff * audioBoost;
+            }
+
+            // Color based on position and density
+            vec3 getColor(vec3 p, float density, float time) {
+                float plaid = plaidPattern(p, u_plaidScale * 0.7, time * u_animSpeed * 1.3);
+                
+                // Audio-reactive color shifting
+                float colorShift = u_audioHigh * 0.5;
+                
+                vec3 color1 = u_color1;
+                vec3 color2 = u_color2;
+                vec3 color3 = u_color3;
+                
+                // Interpolate colors based on plaid pattern and audio
+                vec3 color = mix(color1, color2, plaid + colorShift);
+                color = mix(color, color3, sin(plaid * 3.14159 + time + colorShift) * 0.5 + 0.5);
+                
+                return color * density * u_brightness;
+            }
+
+            // Raymarching function
+            vec4 raymarch(vec3 ro, vec3 rd) {
+                float t = 0.0;
+                vec3 color = vec3(0.0);
+                float alpha = 0.0;
+                
+                float stepSize = 0.1;
+                int maxSteps = 100;
+                
+                for(int i = 0; i < 100; i++) {
+                    if(i >= maxSteps || alpha >= 0.99) break;
+                    
+                    vec3 p = ro + rd * t;
+                    float density = getDensity(p, u_time);
+                    
+                    if(density > 0.01) {
+                        vec3 sampleColor = getColor(p, density, u_time);
+                        float sampleAlpha = density * stepSize;
+                        
+                        // Alpha blending
+                        color += sampleColor * sampleAlpha * (1.0 - alpha);
+                        alpha += sampleAlpha * (1.0 - alpha);
+                    }
+                    
+                    t += stepSize;
+                    
+                    // Adaptive step size based on density
+                    stepSize = mix(0.05, 0.2, 1.0 - density);
+                }
+                
+                return vec4(color, alpha);
+            }
+
+            void main() {
+                vec2 uv = (gl_FragCoord.xy - 0.5 * u_resolution) / min(u_resolution.x, u_resolution.y);
+                
+                // Ray direction from camera through screen
+                vec3 ro = u_cameraPosition;
+                vec3 rd = normalize(vWorldPosition - ro);
+                
+                // Raymarch through the volume
+                vec4 result = raymarch(ro, rd);
+                
+                // Background gradient
+                vec3 background = mix(vec3(0.02, 0.02, 0.05), vec3(0.05, 0.02, 0.08), 
+                                    length(uv) * 0.5);
+                
+                // Composite result
+                vec3 finalColor = mix(background, result.rgb, result.a);
+                
+                gl_FragColor = vec4(finalColor, 1.0);
+            }
+        `;
+
+        class AetherWeave {
+            constructor() {
+                this.scene = new THREE.Scene();
+                this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.controls = {};
+                this.audio = {
+                    context: null,
+                    analyser: null,
+                    dataArray: null,
+                    source: null,
+                    enabled: false
+                };
+                this.uniforms = {
+                    u_time: { value: 0 },
+                    u_plaidScale: { value: 1.0 },
+                    u_animSpeed: { value: 1.0 },
+                    u_density: { value: 1.0 },
+                    u_brightness: { value: 1.0 },
+                    u_color1: { value: new THREE.Color(0x5d5cde) },
+                    u_color2: { value: new THREE.Color(0xde5d9c) },
+                    u_color3: { value: new THREE.Color(0x5dde9c) },
+                    u_cameraPosition: { value: new THREE.Vector3() },
+                    u_audioLow: { value: 0 },
+                    u_audioMid: { value: 0 },
+                    u_audioHigh: { value: 0 },
+                    u_resolution: { value: new THREE.Vector2() }
+                };
+
+                this.movement = {
+                    forward: false,
+                    backward: false,
+                    left: false,
+                    right: false,
+                    up: false,
+                    down: false,
+                    speed: 0.1,
+                    fastSpeed: 0.3
+                };
+
+                this.mouse = {
+                    x: 0,
+                    y: 0,
+                    sensitivity: 0.002
+                };
+
+                this.init();
+            }
+
+            init() {
+                this.setupRenderer();
+                this.setupScene();
+                this.setupControls();
+                this.setupAudio();
+                this.bindEvents();
+                this.animate();
+                
+                // Hide loading screen
+                setTimeout(() => {
+                    document.getElementById('loading').style.display = 'none';
+                }, 1000);
+            }
+
+            setupRenderer() {
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.setClearColor(0x000000);
+                document.getElementById('canvas-container').appendChild(this.renderer.domElement);
+                
+                this.uniforms.u_resolution.value.set(window.innerWidth, window.innerHeight);
+            }
+
+            setupScene() {
+                // Create a large cube that fills the view
+                const geometry = new THREE.BoxGeometry(20, 20, 20);
+                const material = new THREE.ShaderMaterial({
+                    vertexShader,
+                    fragmentShader,
+                    uniforms: this.uniforms,
+                    transparent: true,
+                    side: THREE.BackSide
+                });
+
+                this.volumeMesh = new THREE.Mesh(geometry, material);
+                this.scene.add(this.volumeMesh);
+
+                // Position camera
+                this.camera.position.set(0, 0, 5);
+                this.camera.rotation.set(0, 0, 0);
+            }
+
+            setupControls() {
+                // Slider controls
+                const sliders = {
+                    plaidScale: 'u_plaidScale',
+                    animSpeed: 'u_animSpeed',
+                    density: 'u_density',
+                    brightness: 'u_brightness'
+                };
+
+                Object.entries(sliders).forEach(([id, uniform]) => {
+                    const slider = document.getElementById(id);
+                    slider.addEventListener('input', (e) => {
+                        this.uniforms[uniform].value = parseFloat(e.target.value);
+                    });
+                });
+
+                // Color controls
+                const colors = ['color1', 'color2', 'color3'];
+                colors.forEach((colorId, index) => {
+                    const colorPicker = document.getElementById(colorId);
+                    colorPicker.addEventListener('input', (e) => {
+                        this.uniforms[`u_${colorId}`].value.setHex(e.target.value.replace('#', '0x'));
+                    });
+                });
+
+                // Button controls
+                document.getElementById('audioToggle').addEventListener('click', () => {
+                    this.toggleAudio();
+                });
+
+                document.getElementById('resetView').addEventListener('click', () => {
+                    this.resetView();
+                });
+
+                document.getElementById('randomize').addEventListener('click', () => {
+                    this.randomizeParameters();
+                });
+            }
+
+            setupAudio() {
+                // Create audio visualizer bars
+                const audioViz = document.getElementById('audiobars');
+                for (let i = 0; i < 32; i++) {
+                    const bar = document.createElement('div');
+                    bar.className = 'audio-bar';
+                    bar.style.height = '5px';
+                    audioViz.appendChild(bar);
+                }
+            }
+
+            async toggleAudio() {
+                const button = document.getElementById('audioToggle');
+                const visualizer = document.getElementById('audio-visualizer');
+
+                if (!this.audio.enabled) {
+                    try {
+                        // Request microphone access
+                        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                        
+                        this.audio.context = new (window.AudioContext || window.webkitAudioContext)();
+                        this.audio.analyser = this.audio.context.createAnalyser();
+                        this.audio.analyser.fftSize = 256;
+                        
+                        this.audio.source = this.audio.context.createMediaStreamSource(stream);
+                        this.audio.source.connect(this.audio.analyser);
+                        
+                        this.audio.dataArray = new Uint8Array(this.audio.analyser.frequencyBinCount);
+                        this.audio.enabled = true;
+                        
+                        button.textContent = 'Disable Audio';
+                        button.classList.add('active');
+                        visualizer.style.display = 'block';
+                        
+                    } catch (error) {
+                        console.error('Audio access denied:', error);
+                        button.textContent = 'Audio Denied';
+                    }
+                } else {
+                    if (this.audio.context) {
+                        this.audio.context.close();
+                    }
+                    this.audio.enabled = false;
+                    button.textContent = 'Enable Audio';
+                    button.classList.remove('active');
+                    visualizer.style.display = 'none';
+                }
+            }
+
+            updateAudio() {
+                if (!this.audio.enabled || !this.audio.analyser) return;
+
+                this.audio.analyser.getByteFrequencyData(this.audio.dataArray);
+                
+                // Calculate frequency bands
+                const third = Math.floor(this.audio.dataArray.length / 3);
+                let low = 0, mid = 0, high = 0;
+                
+                for (let i = 0; i < third; i++) {
+                    low += this.audio.dataArray[i];
+                }
+                for (let i = third; i < third * 2; i++) {
+                    mid += this.audio.dataArray[i];
+                }
+                for (let i = third * 2; i < this.audio.dataArray.length; i++) {
+                    high += this.audio.dataArray[i];
+                }
+                
+                // Normalize
+                this.uniforms.u_audioLow.value = (low / third) / 255;
+                this.uniforms.u_audioMid.value = (mid / third) / 255;
+                this.uniforms.u_audioHigh.value = (high / third) / 255;
+
+                // Update visualizer
+                const bars = document.querySelectorAll('.audio-bar');
+                for (let i = 0; i < bars.length && i < this.audio.dataArray.length; i++) {
+                    const height = (this.audio.dataArray[i] / 255) * 50;
+                    bars[i].style.height = Math.max(height, 2) + 'px';
+                }
+            }
+
+            resetView() {
+                this.camera.position.set(0, 0, 5);
+                this.camera.rotation.set(0, 0, 0);
+            }
+
+            randomizeParameters() {
+                document.getElementById('plaidScale').value = 0.5 + Math.random() * 2;
+                document.getElementById('animSpeed').value = 0.2 + Math.random() * 1.5;
+                document.getElementById('density').value = 0.5 + Math.random() * 1;
+                document.getElementById('brightness').value = 0.5 + Math.random() * 2;
+
+                // Trigger input events
+                ['plaidScale', 'animSpeed', 'density', 'brightness'].forEach(id => {
+                    document.getElementById(id).dispatchEvent(new Event('input'));
+                });
+
+                // Random colors
+                const randomColor = () => '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
+                ['color1', 'color2', 'color3'].forEach(id => {
+                    const picker = document.getElementById(id);
+                    picker.value = randomColor();
+                    picker.dispatchEvent(new Event('input'));
+                });
+            }
+
+            bindEvents() {
+                // Keyboard controls
+                document.addEventListener('keydown', (e) => {
+                    switch(e.code) {
+                        case 'KeyW':
+                        case 'ArrowUp':
+                            this.movement.forward = true;
+                            break;
+                        case 'KeyS':
+                        case 'ArrowDown':
+                            this.movement.backward = true;
+                            break;
+                        case 'KeyA':
+                        case 'ArrowLeft':
+                            this.movement.left = true;
+                            break;
+                        case 'KeyD':
+                        case 'ArrowRight':
+                            this.movement.right = true;
+                            break;
+                        case 'Space':
+                            this.movement.up = true;
+                            e.preventDefault();
+                            break;
+                        case 'KeyC':
+                            this.movement.down = true;
+                            break;
+                    }
+                });
+
+                document.addEventListener('keyup', (e) => {
+                    switch(e.code) {
+                        case 'KeyW':
+                        case 'ArrowUp':
+                            this.movement.forward = false;
+                            break;
+                        case 'KeyS':
+                        case 'ArrowDown':
+                            this.movement.backward = false;
+                            break;
+                        case 'KeyA':
+                        case 'ArrowLeft':
+                            this.movement.left = false;
+                            break;
+                        case 'KeyD':
+                        case 'ArrowRight':
+                            this.movement.right = false;
+                            break;
+                        case 'Space':
+                            this.movement.up = false;
+                            break;
+                        case 'KeyC':
+                            this.movement.down = false;
+                            break;
+                    }
+                });
+
+                // Mouse controls
+                let isMouseDown = false;
+                
+                this.renderer.domElement.addEventListener('mousedown', (e) => {
+                    isMouseDown = true;
+                    this.renderer.domElement.requestPointerLock();
+                });
+
+                document.addEventListener('mouseup', () => {
+                    isMouseDown = false;
+                });
+
+                document.addEventListener('mousemove', (e) => {
+                    if (document.pointerLockElement === this.renderer.domElement) {
+                        this.mouse.x += e.movementX * this.mouse.sensitivity;
+                        this.mouse.y += e.movementY * this.mouse.sensitivity;
+                        
+                        // Clamp vertical rotation
+                        this.mouse.y = Math.max(-Math.PI/2, Math.min(Math.PI/2, this.mouse.y));
+                    }
+                });
+
+                // Touch controls for mobile
+                let lastTouchX = 0, lastTouchY = 0;
+                
+                this.renderer.domElement.addEventListener('touchstart', (e) => {
+                    const touch = e.touches[0];
+                    lastTouchX = touch.clientX;
+                    lastTouchY = touch.clientY;
+                    e.preventDefault();
+                });
+
+                this.renderer.domElement.addEventListener('touchmove', (e) => {
+                    const touch = e.touches[0];
+                    const deltaX = touch.clientX - lastTouchX;
+                    const deltaY = touch.clientY - lastTouchY;
+                    
+                    this.mouse.x += deltaX * this.mouse.sensitivity * 0.5;
+                    this.mouse.y += deltaY * this.mouse.sensitivity * 0.5;
+                    
+                    this.mouse.y = Math.max(-Math.PI/2, Math.min(Math.PI/2, this.mouse.y));
+                    
+                    lastTouchX = touch.clientX;
+                    lastTouchY = touch.clientY;
+                    e.preventDefault();
+                });
+
+                // Scroll zoom
+                this.renderer.domElement.addEventListener('wheel', (e) => {
+                    const direction = new THREE.Vector3(0, 0, e.deltaY > 0 ? 1 : -1);
+                    direction.applyQuaternion(this.camera.quaternion);
+                    this.camera.position.add(direction.multiplyScalar(0.1));
+                    e.preventDefault();
+                });
+
+                // Window resize
+                window.addEventListener('resize', () => {
+                    this.camera.aspect = window.innerWidth / window.innerHeight;
+                    this.camera.updateProjectionMatrix();
+                    this.renderer.setSize(window.innerWidth, window.innerHeight);
+                    this.uniforms.u_resolution.value.set(window.innerWidth, window.innerHeight);
+                });
+
+                // Hide controls when not hovering
+                let hideTimeout;
+                const controls = document.getElementById('controls');
+                
+                controls.addEventListener('mouseenter', () => {
+                    clearTimeout(hideTimeout);
+                    controls.classList.remove('hidden');
+                });
+
+                controls.addEventListener('mouseleave', () => {
+                    hideTimeout = setTimeout(() => {
+                        controls.classList.add('hidden');
+                    }, 3000);
+                });
+            }
+
+            updateMovement() {
+                const speed = event && event.shiftKey ? this.movement.fastSpeed : this.movement.speed;
+                const direction = new THREE.Vector3();
+
+                if (this.movement.forward) direction.z -= speed;
+                if (this.movement.backward) direction.z += speed;
+                if (this.movement.left) direction.x -= speed;
+                if (this.movement.right) direction.x += speed;
+                if (this.movement.up) direction.y += speed;
+                if (this.movement.down) direction.y -= speed;
+
+                // Apply camera rotation to movement
+                direction.applyQuaternion(this.camera.quaternion);
+                this.camera.position.add(direction);
+            }
+
+            animate() {
+                requestAnimationFrame(() => this.animate());
+
+                // Update time
+                this.uniforms.u_time.value += 0.016;
+
+                // Update camera rotation from mouse
+                this.camera.rotation.y = -this.mouse.x;
+                this.camera.rotation.x = -this.mouse.y;
+                this.camera.rotation.order = 'YXZ';
+
+                // Update movement
+                this.updateMovement();
+
+                // Update camera position uniform
+                this.uniforms.u_cameraPosition.value.copy(this.camera.position);
+
+                // Update audio
+                this.updateAudio();
+
+                // Render
+                this.renderer.render(this.scene, this.camera);
+            }
+        }
+
+        // Initialize the application
+        window.addEventListener('load', () => {
+            new AetherWeave();
+        });
+
+        // Dark mode support
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+        }
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+            if (event.matches) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        });
+    </script>
+</body>
+</html>
